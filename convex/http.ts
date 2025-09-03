@@ -40,14 +40,14 @@ export const getLastDayStatsHttp = httpAction(async (ctx, request) => {
 export const getAllUsersLastDayStatsHttp = httpAction(async (ctx, request) => {
   try {
     // Call the new query that gets all users' stats
-    const allStats = await ctx.runQuery(api.sessions.getAllUsersLastDayStats);
+    const allStats = await ctx.runQuery(api.sessions.getAllUsersTodayStats);    
 
     return new Response(JSON.stringify(allStats), {
       headers: { "content-type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    console.error("Error in getAllUsersLastDayStatsHttp:", error);
+    console.error("Error in getAllUsersTodayStatsHttp:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "content-type": "application/json" },
