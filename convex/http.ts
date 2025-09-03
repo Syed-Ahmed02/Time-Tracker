@@ -37,7 +37,7 @@ export const getLastDayStatsHttp = httpAction(async (ctx, request) => {
 });
 
 // HTTP action for getting all users' last day stats
-export const getAllUsersLastDayStatsHttp = httpAction(async (ctx, request) => {
+export const getAllUsersTodayStatsHttp = httpAction(async (ctx, request) => {
   try {
     // Call the new query that gets all users' stats
     const allStats = await ctx.runQuery(api.sessions.getAllUsersTodayStats);    
@@ -88,7 +88,7 @@ http.route({
 http.route({
   path: "/getAllUsersLastDayStats",
   method: "GET",
-  handler: getAllUsersLastDayStatsHttp,
+  handler: getAllUsersTodayStatsHttp,
 });
 
 // Export the router as default

@@ -94,6 +94,9 @@ export default function TimeTracker() {
     convexUser ? { userId: convexUser._id } : "skip"
   )
 
+  // Get all active sessions (users currently clocked in)
+  const activeSessionsData = useQuery(api.sessions.getAllActiveSessions)
+
   const startSessionMutation = useMutation(api.sessions.startSession)
   const endSessionMutation = useMutation(api.sessions.endSession)
   const createManualSessionMutation = useMutation(api.sessions.createManualSession)
@@ -399,6 +402,57 @@ export default function TimeTracker() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Active Users Section */}
+        {activeSessionsData && activeSessionsData.totalActiveUsers > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Currently Active ({activeSessionsData.totalActiveUsers})
+              </CardTitle>
+              <CardDescription>
+                Team members who are currently clocked in
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {activeSessionsData.activeUsers.map((activeUser) => (
+                  <div key={activeUser.sessionId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      {activeUser.userImageUrl ? (
+                        <img
+                          src={activeUser.userImageUrl}
+                          alt={activeUser.userName}
+                          className="w-8 h-8 rounded-full"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-accent-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-sm">{activeUser.userName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Since {formatTimeInUserTimezone(activeUser.startTime, activeUser.timezone)}
+                        </p>
+                        {activeUser.description && (
+                          <p className="text-xs text-muted-foreground mt-1 italic">
+                            "{activeUser.description}"
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Active
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Status Footer */}
         <div className="text-center text-xs text-muted-foreground">

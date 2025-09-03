@@ -417,6 +417,48 @@ export const getAllUsersTodayStats = query({
   },
 });
 
+// Get all currently active (ongoing) sessions with user information
+export const getAllActiveSessions = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get all sessions that don't have an endTime (ongoing sessions)
+    const activeSessions = await ctx.db
+      .query("sessions")
+      .filter((q) => q.eq(q.field("endTime"), undefined))
+      .collect();
+
+    // Get user information for each active session
+    const activeUsersWithSessions = await Promise.all(
+      activeSessions.map(async (session) => {
+        const user = await ctx.db.get(session.userId);
+        if (!user) return null;
+
+        return {
+          sessionId: session._id,
+          userId: user._id,
+          userName: user.name || "Unknown User",
+          userEmail: user.email,
+          userImageUrl: user.imageUrl,
+          startTime: session.startTime,
+          description: session.description,
+          timezone: user.timezone,
+        };
+      })
+    );
+
+    // Filter out null values (users that might have been deleted)
+    const validActiveUsers = activeUsersWithSessions.filter(user => user !== null);
+
+    // Sort by start time (most recent first)
+    validActiveUsers.sort((a, b) => new Date(b!.startTime).getTime() - new Date(a!.startTime).getTime());
+
+    return {
+      activeUsers: validActiveUsers,
+      totalActiveUsers: validActiveUsers.length,
+    };
+  },
+});
+
 // Get session summary statistics for a user
 export const getSessionSummary = query({
   args: {
