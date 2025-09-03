@@ -1,6 +1,32 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+/**
+ * Usage example for getLastDayStats:
+ *
+ * // In your React component:
+ * import { useQuery } from "convex/react";
+ * import { api } from "../convex/_generated/api";
+ *
+ * function YesterdayStats({ userId }: { userId: string }) {
+ *   const stats = useQuery(api.sessions.getLastDayStats, { userId });
+ *
+ *   if (!stats) return <div>Loading...</div>;
+ *
+ *   return (
+ *     <div>
+ *       <h2>Yesterday's Stats ({stats.date})</h2>
+ *       <p>Total Sessions: {stats.totalSessions}</p>
+ *       <p>Completed: {stats.completedSessions}</p>
+ *       <p>Ongoing: {stats.ongoingSessions}</p>
+ *       <p>Total Time: {Math.floor(stats.totalDuration / 60)}h {stats.totalDuration % 60}m</p>
+ *       <p>Average Session: {Math.floor(stats.averageDuration / 60)}h {stats.averageDuration % 60}m</p>
+ *       <p>Completion Rate: {stats.completionRate}%</p>
+ *     </div>
+ *   );
+ * }
+ */
+
 // Helper function to convert UTC time to Dubai time (UTC+4)
 function toDubaiTime(date: Date): Date {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60000); // Convert to UTC
@@ -272,6 +298,122 @@ export const createManualSession = mutation({
     });
 
     return await ctx.db.get(sessionId);
+  },
+});
+
+// Get user's stats for the last day (yesterday)
+export const getLastDayStats = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    // Calculate yesterday's date in Dubai time
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDate = formatDubaiDate(yesterday);
+
+    // Get all sessions for yesterday
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", args.userId).eq("date", yesterdayDate)
+      )
+      .collect();
+
+    const completedSessions = sessions.filter(s => s.endTime && s.duration);
+    const ongoingSessions = sessions.filter(s => !s.endTime);
+
+    const totalDuration = completedSessions.reduce((sum, session) => sum + session.duration!, 0);
+    const totalSessions = sessions.length;
+    const completedCount = completedSessions.length;
+    const ongoingCount = ongoingSessions.length;
+
+    return {
+      date: yesterdayDate,
+      totalSessions,
+      completedSessions: completedCount,
+      ongoingSessions: ongoingCount,
+      totalDuration, // in minutes
+      averageDuration: completedCount > 0 ? Math.round(totalDuration / completedCount) : 0,
+      completionRate: totalSessions > 0 ? Math.round((completedCount / totalSessions) * 100) : 0,
+      hasOngoingSession: ongoingCount > 0,
+      sessions: sessions.map(session => ({
+        id: session._id,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        duration: session.duration,
+        description: session.description,
+        isOngoing: !session.endTime,
+      })),
+    };
+  },
+});
+
+// Get last day stats for all users (organized by email)
+export const getAllUsersLastDayStats = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get all users
+    const users = await ctx.db.query("users").collect();
+
+    // Calculate yesterday's date in Dubai time
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDate = formatDubaiDate(yesterday);
+
+    // Get stats for each user
+    const allStats = await Promise.all(
+      users.map(async (user) => {
+        // Get all sessions for this user on yesterday
+        const sessions = await ctx.db
+          .query("sessions")
+          .withIndex("by_user_date", (q) =>
+            q.eq("userId", user._id).eq("date", yesterdayDate)
+          )
+          .collect();
+
+        const completedSessions = sessions.filter(s => s.endTime && s.duration);
+        const ongoingSessions = sessions.filter(s => !s.endTime);
+
+        const totalDuration = completedSessions.reduce((sum, session) => sum + session.duration!, 0);
+        const totalSessions = sessions.length;
+        const completedCount = completedSessions.length;
+        const ongoingCount = ongoingSessions.length;
+
+        return {
+          email: user.email,
+          userId: user._id,
+          name: user.name,
+          date: yesterdayDate,
+          totalSessions,
+          completedSessions: completedCount,
+          ongoingSessions: ongoingCount,
+          totalDuration, // in minutes
+          averageDuration: completedCount > 0 ? Math.round(totalDuration / completedCount) : 0,
+          completionRate: totalSessions > 0 ? Math.round((completedCount / totalSessions) * 100) : 0,
+          hasOngoingSession: ongoingCount > 0,
+          sessions: sessions.map(session => ({
+            id: session._id,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            duration: session.duration,
+            description: session.description,
+            isOngoing: !session.endTime,
+          })),
+        };
+      })
+    );
+
+    // Filter out users with no activity yesterday and sort by email
+    const activeUsersStats = allStats
+      .filter(stats => stats.totalSessions > 0)
+      .sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+
+    return {
+      date: yesterdayDate,
+      totalActiveUsers: activeUsersStats.length,
+      usersStats: activeUsersStats,
+    };
   },
 });
 

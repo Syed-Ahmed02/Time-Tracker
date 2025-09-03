@@ -20,7 +20,9 @@ export default defineSchema({
     // Index for fast lookups by Clerk user ID
     .index("by_clerkUserId", ["clerkUserId"])
     // Index for searching users by name
-    .index("by_name", ["name"]),
+    .index("by_name", ["name"])
+
+    .index("by_email", ["email"]),
 
   // Sessions table for tracking work time
   sessions: defineTable({
