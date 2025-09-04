@@ -495,3 +495,76 @@ export const getSessionSummary = query({
     };
   },
 });
+
+// Get time frame stats for all users within a given date range
+export const getAllUsersTimeFrameStats = query({
+  args: {
+    startDate: v.string(), // Format: YYYY-MM-DD
+    endDate: v.string(),   // Format: YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    // Get all users
+    const users = await ctx.db.query("users").collect();
+
+    // Get stats for each user within the date range
+    const allStats = await Promise.all(
+      users.map(async (user) => {
+        // Get all sessions for this user within the date range
+        const sessions = await ctx.db
+          .query("sessions")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .filter((q) => 
+            q.and(
+              q.gte(q.field("date"), args.startDate),
+              q.lte(q.field("date"), args.endDate)
+            )
+          )
+          .collect();
+
+        const completedSessions = sessions.filter(s => s.endTime && s.duration);
+        const ongoingSessions = sessions.filter(s => !s.endTime);
+
+        const totalDuration = completedSessions.reduce((sum, session) => sum + session.duration!, 0);
+        const totalSessions = sessions.length;
+        const completedCount = completedSessions.length;
+        const ongoingCount = ongoingSessions.length;
+
+        return {
+          email: user.email,
+          userId: user._id,
+          name: user.name,
+          startDate: args.startDate,
+          endDate: args.endDate,
+          totalSessions,
+          completedSessions: completedCount,
+          ongoingSessions: ongoingCount,
+          totalDuration, // in minutes
+          averageDuration: completedCount > 0 ? Math.round(totalDuration / completedCount) : 0,
+          completionRate: totalSessions > 0 ? Math.round((completedCount / totalSessions) * 100) : 0,
+          hasOngoingSession: ongoingCount > 0,
+          sessions: sessions.map(session => ({
+            id: session._id,
+            date: session.date,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            duration: session.duration,
+            description: session.description,
+            isOngoing: !session.endTime,
+          })),
+        };
+      })
+    );
+
+    // Filter out users with no activity in the time frame and sort by email
+    const activeUsersStats = allStats
+      .filter(stats => stats.totalSessions > 0)
+      .sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+
+    return {
+      startDate: args.startDate,
+      endDate: args.endDate,
+      totalActiveUsers: activeUsersStats.length,
+      usersStats: activeUsersStats,
+    };
+  },
+});
