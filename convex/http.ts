@@ -37,17 +37,17 @@ export const getLastDayStatsHttp = httpAction(async (ctx, request) => {
 });
 
 // HTTP action for getting all users' last day stats
-export const getAllUsersTodayStatsHttp = httpAction(async (ctx, request) => {
+export const getAllUsersLastDayStatsHttp = httpAction(async (ctx, request) => {
   try {
     // Call the new query that gets all users' stats
-    const allStats = await ctx.runQuery(api.sessions.getAllUsersTodayStats);    
+    const allStats = await ctx.runQuery(api.sessions.getAllUsersLastDayStats);    
 
     return new Response(JSON.stringify(allStats), {
       headers: { "content-type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    console.error("Error in getAllUsersTodayStatsHttp:", error);
+    console.error("Error in getAllUsersLastDayStatsHttp:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "content-type": "application/json" },
@@ -145,7 +145,7 @@ http.route({
 http.route({
   path: "/getAllUsersLastDayStats",
   method: "GET",
-  handler: getAllUsersTodayStatsHttp,
+  handler: getAllUsersLastDayStatsHttp,
 });
 
 // Route for getting all users' time frame stats

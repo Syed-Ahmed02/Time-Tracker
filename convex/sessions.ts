@@ -349,26 +349,26 @@ export const getLastDayStats = query({
 });
 
 // Get last day stats for all users (organized by email)
-export const getAllUsersTodayStats = query({
+export const getAllUsersLastDayStats = query({
   args: {},
   handler: async (ctx) => {
     // Get all users
     const users = await ctx.db.query("users").collect();
 
-    // Calculate today's date in Dubai time
+    // Calculate yesterday's date in Dubai time
     const now = new Date();
-    const today = new Date(now);
-    today.setDate(today.getDate());
-    const todayDate = formatDubaiDate(today);
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDate = formatDubaiDate(yesterday);
 
     // Get stats for each user
     const allStats = await Promise.all(
       users.map(async (user) => {
-        // Get all sessions for this user on today
+        // Get all sessions for this user on last day
         const sessions = await ctx.db
           .query("sessions")
           .withIndex("by_user_date", (q) =>
-            q.eq("userId", user._id).eq("date", todayDate)
+            q.eq("userId", user._id).eq("date", yesterdayDate)
           )
           .collect();
 
@@ -384,7 +384,7 @@ export const getAllUsersTodayStats = query({
           email: user.email,
           userId: user._id,
           name: user.name,
-          date: todayDate,
+          date: yesterdayDate,
           totalSessions,
           completedSessions: completedCount,
           ongoingSessions: ongoingCount,
@@ -410,7 +410,7 @@ export const getAllUsersTodayStats = query({
       .sort((a, b) => (a.email || '').localeCompare(b.email || ''));
 
     return {
-      date: todayDate,
+      date: yesterdayDate,
       totalActiveUsers: activeUsersStats.length,
       usersStats: activeUsersStats,
     };
